@@ -5,13 +5,16 @@ const client = new Discord.Client();
 const app = express()
 
 const token_bot = "ur key here"
-const owner_id = "ur id."
-const prefix = "!"
+const owner_id = "ur id"
+const prefix = "?"
 const database = 'database.json'
 const basicdaily = 250
-const port = 6948;
+const port = 8080;
+const version_bot = "1.2.1a (6/4/2021)"
 let cooldown = new Set()
 let cdsecond = 3;
+
+const owner_question = ["What happen with toonrun?","is toonrun lazy?"]
 
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -34,6 +37,14 @@ function print(message)
     console.dir(message)
 }
 
+function encode_utf8(s) {
+    return unescape(encodeURIComponent(s));
+  }
+  
+  function decode_utf8(s) {
+    return decodeURIComponent(escape(s));
+  }
+
 function Find(UID)
 {
     return new Promise((resolve,rejected) =>{
@@ -52,6 +63,7 @@ function Find(UID)
         })
     })
 }
+
 
 function Get()
 {
@@ -80,22 +92,45 @@ function sendm(topic,msgc,message,color)
     msgc.channel.send(embed)
 }
 
+function isadmin(UID)
+{
+    return new Promise((resolve,reject) =>{
+        Find(UID).then((body) =>{
+            if (UID == owner_id)
+            {
+                resolve({"code":1})
+            }
+            if (body.stack && body.stack.isadmin == true)
+            {
+                resolve({"code":1})
+            }
+            else
+            {
+                resolve({"code":-1})
+            }
+        })
+    })
+}
+
 function setvalue(UID,UPDATE,TO)
 {
-    Find(UID).then((body) =>{
-        if (body != null)
-        {
-            Get().then((obj) =>{                    
-                const new_table = obj
-                const userbodydata = new_table.userdata[body.location]
+    return new Promise((resolve,reject) =>{
+        Find(UID).then((body) =>{
+            if (body != null)
+            {
+                Get().then((obj) =>{                    
+                    const new_table = obj
+                    const userbodydata = new_table.userdata[body.location]
 
-                userbodydata[UPDATE] = TO
+                    userbodydata[UPDATE] = TO
 
-                jsonfile.writeFile(database, new_table, function (err) {
-                    if (err) console.error(err)
-                }) 
+                    jsonfile.writeFile(database, new_table, function (err) {
+                        if (err) resolve({"code":-1,"stack":"error."})
+                        resolve({"code":1,"stack":"complete."})
+                     })
+                })
+            }
         })
-        }
     })
 }
 
@@ -458,21 +493,39 @@ client.on('message', message => {
                         {
                             daily(UID,message,username)
                         }
-                        if (cmd == "")
+                        if (cmd == "question")
                         {
+                            const random = Math.floor(Math.random() * owner_question.length);
+                            const questiontada = owner_question[random]
 
+                            sendm("My question!",message,questiontada+" ||...","#FFFF00")
+                        }
+                        if (cmd == "source")
+                        {
+                            message.channel.send('https://github.com/toonrun123/discord-bot-open-source');
                         }
                         else
                         if (cmd == "noyes")
                         {
                             const question = args[0]
                             const embed = new Discord.MessageEmbed()
+                            const random = Math.random * 2
                             if (question)
                             {
-                                embed.setTitle(question)
-                                embed.setColor("#990099")
-                                embed.addField("Yes.","")
-                                message.channel.send(embed)
+                                if (random >=2)
+                                {
+                                    embed.setTitle(question)
+                                    embed.setColor("#990099")
+                                    embed.addField("Yes.","")
+                                    message.channel.send(embed)
+                                }
+                                else
+                                {
+                                    embed.setTitle(question)
+                                    embed.setColor("#990099")
+                                    embed.addField("No.","")
+                                    message.channel.send(embed)
+                                }
                             }
                             else
                             {
@@ -491,9 +544,55 @@ client.on('message', message => {
                             embed.addField("luckshuffle <Coin>","Random your Catcoins!")
                             embed.addField("pay <To> <Cash>","Pay Catcoin to target account!")
                             embed.addField("noyes <question>","Bot will say yes and no.")
+                            embed.addField("question","owner question!")
+                            embed.addField("source","open source code this bot!")
                             embed.addField("credit","who build this bot??")
-                            //embed.addField("apis","who build this bot??")
+                            embed.addField("version","Get this version bot.")
                             message.channel.send(embed);
+                        }
+                        else
+                        if (cmd == "admincmd" || cmd == "admincmds")
+                        {
+                            isadmin(UID).then((res) =>{
+                                if (res.code == 1)
+                                {
+                                    const embed = new Discord.MessageEmbed()
+                                    embed.setTitle("All Admins Commands!")
+                                    embed.setColor("#990099")
+                                    embed.addField("ban <UID> <REASON>","Ban people.")
+                                    embed.addField("unban <UID>","unBan people.")
+                                    message.channel.send(embed);
+                                }
+                                else
+                                {
+                                    sendm("Access Denied.",message,"Reason: ||you not allowed use this command.","FF0000")
+                                }
+                            })
+                        }
+                        else
+                        if (cmd == "giveadmin")
+                        {
+                            if (UID == owner_id)
+                            {
+                                var UID_TARGET = args[0]
+                                if (UID == owner_id)
+                                {
+                                    if (UID_TARGET)
+                                    {
+                                        setvalue(UID,"isadmin",true).then((useless) =>{
+                                            sendm("CMD RUNNING.",message,"GIVE ADMIN COMPLETE. ||...","00FF00")
+                                        })
+                                    }
+                                }
+                                else
+                                {
+                                    sendm("CMD ERROR",message,"COMMAND: ||giveadmin <UID>.","FF0000")
+                                }
+                            }
+                            else
+                            {
+                                sendm("Access Denied.",message,"Reason: ||owner bot can give only.","FF0000")
+                            }
                         }
                         else
                         if (cmd == "credit")
@@ -505,7 +604,7 @@ client.on('message', message => {
                         {
                             const msg = message.channel.send('Pinging...');
                             msg.then((true_msg) =>{
-                                true_msg.edit(`🏓 Pong\n<@${message.author.id}> Latency is ${Math.floor(true_msg.createdAt - message.createdAt)} ms \n🤖 Client Latency is ${Math.round(client.ws.ping)} ms`)
+                                true_msg.edit(`🏓 Pong\n<@${message.author.id}> Latency is ${Math.floor(true_msg.createdAt - message.createdAt)} ms. (${Math.floor(true_msg.createdAt - message.createdAt)/1000} Second.) \n🤖 Client Latency is ${Math.round(client.ws.ping)} ms. (${Math.round(client.ws.ping)/1000} Second.)`)
                             })
                         }
                         else
@@ -519,23 +618,70 @@ client.on('message', message => {
                             pay(UID,message)
                         }
                         else
+                        if (cmd == "version")
+                        {
+                            message.channel.send(version_bot)
+                        }
+                        else
                         if (cmd == "ban")
                         {
-                            if (UID == owner_id)
-                            {
-                                Find(args[0]).then((body) =>{
-                                    
-                                })
-                            }
+                            isadmin(UID).then((res) =>{
+                                if (res.code == 1)
+                                {
+                                    var UID_TARGET = args[0]
+                                    var BAN_REASON = args[1]
+                                    if (UID_TARGET && BAN_REASON)
+                                    {
+                                        setvalue(UID_TARGET,"isbanned",true).then((tada) =>{
+                                            setvalue(UID_TARGET,"banreason",BAN_REASON).then((tada2) =>{
+                                                sendm("CMD RUNNING.",message,"BANNED COMPLETE. ||...","00FF00")
+                                            })
+                                        })
+                                    }
+                                    else
+                                    {
+                                        sendm("CMD ERROR",message,"ban <UID> <REASON> ||...","FF0000")
+                                    }
+                                }
+                                else
+                                {
+                                    sendm("Access Denied.",message,"Reason: ||you not allowed use this command.","FF0000")
+                                } 
+                            })    
+                        }
+                        else
+                        if (cmd == "unban")
+                        {
+                            isadmin(UID).then((res) =>{
+                                if (res.code == 1)
+                                {
+                                    var UID_TARGET = args[0]
+                                    if (UID_TARGET)
+                                    {
+                                        setvalue(UID_TARGET,"isbanned",false).then((tada) =>{
+                                            sendm("CMD RUNNING.",message,"UNBANNED COMPLETE. ||...","00FF00")
+                                        })
+                                    }
+                                    else
+                                    {
+                                        sendm("CMD ERROR",message,"unban <UID> ||...","FF0000")
+                                    }
+                                }
+                                else
+                                {
+                                    sendm("Access Denied.",message,"Reason: ||you not allowed use this command.","FF0000")
+                                } 
+                            })   
                         }
                         else
                         if (cmd == "apis")
                         {
-
+                            
                         }
                         else
+                        if (cmd == "sad")
                         {
-                            sendm("No commands!",message,"I can't find that command! || Please say "+prefix+"cmds","#FF0000")
+                            sendm("...",message,"why || why","#ffcc00")
                         }
                         setTimeout(() =>{
                             cooldown.delete(message.author.id)
