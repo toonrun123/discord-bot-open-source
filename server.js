@@ -1,29 +1,27 @@
 const Discord = require('discord.js');
 const jsonfile = require('jsonfile');
-const express = require('express');
 const client = new Discord.Client();
-const app = express()
 
-const token_bot = "ur key here"
-const owner_id = "ur id"
+const token_bot = "-"
+const owner_id = "-"
 const prefix = "?"
 const database = 'database.json'
 const basicdaily = 250
-const port = 8080;
-const version_bot = "1.2.1a (6/4/2021)"
+const version_bot = "1.4.1a (18/6/2564)"
+const BotStatus = {["type"]:"WATCHING",["status"]:"online",["custom_status"]:'Prefix: '+prefix,["C"]:"เป็นได้แค่ที่ปรึกษาของเธอ."}
 let cooldown = new Set()
-let cdsecond = 3;
+let cdsecond = 1;
 
-const owner_question = ["What happen with toonrun?","is toonrun lazy?"]
+const owner_question = ["is toonrun lazy?","Who know what u doing rn?","Who is creator this bot?","Why you think that?","koonpass001 is bad?","Do you play roblox?","Who is David Baszucki","This bot for?","What's your perfect breakfast?","What do you like best about yourself?","What can you talk about for hours?","You woke up, you noticed something... You are another person. What's going to be the first thing you're gonna do?","You have to listen to 1 song forever until you die, what would be the song","what's your favourite Movie?","When did you join or know about our game (bangsaen beach), and how?"]
 
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
     client.user.setPresence({
-        status: 'online',
+        status: BotStatus.status,
         activity: {
-            name: 'Prefix: '+prefix,
-            type: 'PLAYING',
+            name: BotStatus.custom_status,
+            type: BotStatus.type,
         }
     })
 }); 
@@ -148,13 +146,14 @@ function tradecoin(UID,UID_TARGET,COIN_TRADE)
                             const userbodydata = new_table.userdata[body.location]
                             const target_userbodydata = new_table.userdata[body_target.location]
                             
-                            userbodydata.coin -= COIN_TRADE
-                            target_userbodydata.coin += COIN_TRADE
+                            const resuser = userbodydata.coin - COIN_TRADE
+                            const resusertarget = target_userbodydata.coin + COIN_TRADE
 
-                            jsonfile.writeFile(database, new_table, function (err) {
-                                if (err) console.error(err)
-                            }) 
-                            resolve({"code":1,"stack":"success"})
+                            setvalue(userbodydata.UID,"coin",resuser).then(() =>{
+                                setvalue(target_userbodydata.UID,"coin",resusertarget).then(() =>{
+                                    resolve({"code":1,"stack":"success"})
+                                })
+                            })
                         })
                     }
                     else
@@ -262,67 +261,42 @@ function noaccountcase(UID)
     })
 }
 
-function daily(UID,message,username)
+async function daily(UID,message,username)
 {
     Find(UID).then((body) =>{
         if (body != null)
         {
             const coingot = (basicdaily + ((body.stack.streak * 100)+50))
-
-            const unix = Date.now();
-            const date = new Date(unix)
-            const dateing = date.toLocaleDateString("EN-US").split("/")
-
-            const day = dateing[1]
-            const month = dateing[0]
-            const year = dateing[2]
+            const timeout = 8.64e+7
 
             Get().then((obj) =>{                    
                 const new_table = obj
                 const userbodydata = new_table.userdata[body.location]
                 
-                const old_date = userbodydata.datedaily.split("/")
-
-                const old_day = old_date[0]
-                const old_month = old_date[1]
-                const old_year = old_date[2]
-
-                let allthing = 0;
-
-                if (old_day > day)
+                const old_date = userbodydata.datedaily
+                var detectoldtable = null
+                if (!Number(userbodydata.datedaily))
                 {
-                    allthing = old_day - day
-                }
-                if (old_day < day)
-                {
-                    allthing = day - old_day
+                    detectoldtable = userbodydata.datedaily.split("/")
                 }
 
-                if (allthing == 1 || month != old_month || year != old_year)
+                if (detectoldtable)
+                {
+                    setvalue(UID,"datedaily",Date.now())
+                }
+                if (timeout - (Date.now() - old_date) >0)
+                {
+                    var date = new Date((timeout - (Date.now() - old_date)));
+                    sendm("Daily",message,username+" Already get daily! || "+date.getHours()+" Hours "+date.getMinutes()+" Minutes "+date.getSeconds()+" Seconds","#00FF00")
+                }
+                else
                 {
                     sendm("Daily",message,username+" got || "+coingot+" Catcoin! ("+(userbodydata.streak+1)+" streak)","#00FF00")
                     const oldcoin = userbodydata.coin
                     const newcoin = (Number(oldcoin) + Number(coingot))
-                    userbodydata.datedaily = day+"/"+month+"/"+year
+                    userbodydata.datedaily = Date.now()
                     userbodydata.streak += 1
                     userbodydata.coin = newcoin
-                    jsonfile.writeFile(database, new_table, function (err) {
-                        if (err) console.error(err)
-                    }) 
-                }
-                else
-                if (allthing == 0)
-                {
-                    sendm("Daily",message,username+" Already get daily! || Dont forgot!","#00FF00")
-                }
-                else
-                {
-                    sendm("Daily",message,username+" got || "+coingot+" Catcoin! (0 streak)","#00FF00")
-                    const oldcoin = userbodydata.coin
-                    const newcoin = (Number(oldcoin) + Number(coingot))
-                    userbodydata.datedaily = day+"/"+month+"/"+year
-                    userbodydata.coin = newcoin
-                    userbodydata.streak = 0
                     jsonfile.writeFile(database, new_table, function (err) {
                         if (err) console.error(err)
                     }) 
@@ -412,9 +386,11 @@ function getleaderboard()
     })
 }
 
-function pay(UID,message)
+function pay(UID,message,args)
 {
-    var mention = message.content.split(" ")
+    if (args[0] && args[1])
+    {
+        var mention = message.content.split(" ")
         var coin = mention[2]
         if (coin == " " || coin == "")
         {
@@ -450,6 +426,11 @@ function pay(UID,message)
         {
             sendm("Error!",message,"Please insert your Coin for pay || pay <Target> <Cash>","#FF0000")
         }
+    } 
+    else
+    {
+        sendm("Error!",message,"Error || pay <Target> <Cash>","#FF0000")
+    } 
 }
 
 client.on('message', message => {
@@ -508,22 +489,23 @@ client.on('message', message => {
                         if (cmd == "noyes")
                         {
                             const question = args[0]
-                            const embed = new Discord.MessageEmbed()
-                            const random = Math.random * 2
+                            const random = Math.random()
                             if (question)
                             {
-                                if (random >=2)
+                                if (random >=0.5)
                                 {
+                                    const embed = new Discord.MessageEmbed()
                                     embed.setTitle(question)
                                     embed.setColor("#990099")
-                                    embed.addField("Yes.","")
+                                    embed.addField("Yes.","...")
                                     message.channel.send(embed)
                                 }
                                 else
                                 {
+                                    const embed = new Discord.MessageEmbed()
                                     embed.setTitle(question)
                                     embed.setColor("#990099")
-                                    embed.addField("No.","")
+                                    embed.addField("No.","...")
                                     message.channel.send(embed)
                                 }
                             }
@@ -538,13 +520,14 @@ client.on('message', message => {
                             const embed = new Discord.MessageEmbed()
                             embed.setTitle("All Commands!")
                             embed.setColor("#990099")
+                            embed.addField("botstatus","Check bot Status.")
                             embed.addField("ping","for check your ping and bot!")
                             embed.addField("daily","For get daily!")
                             embed.addField("coin","For looking your Catcoins!")
                             embed.addField("luckshuffle <Coin>","Random your Catcoins!")
                             embed.addField("pay <To> <Cash>","Pay Catcoin to target account!")
                             embed.addField("noyes <question>","Bot will say yes and no.")
-                            embed.addField("question","owner question!")
+                            embed.addField("question","random question!")
                             embed.addField("source","open source code this bot!")
                             embed.addField("credit","who build this bot??")
                             embed.addField("version","Get this version bot.")
@@ -568,6 +551,17 @@ client.on('message', message => {
                                     sendm("Access Denied.",message,"Reason: ||you not allowed use this command.","FF0000")
                                 }
                             })
+                        }
+                        else
+                        if (cmd == "botstatus")
+                        {
+                            const embed = new Discord.MessageEmbed()
+                            embed.setTitle("All Admins Commands!")
+                            embed.setColor("#990099")
+                            embed.addField("Status",BotStatus.status)
+                            embed.addField("Custom Status",BotStatus.C)
+                            embed.addField("Prefix",BotStatus.custom_status)
+                            message.channel.send(embed);
                         }
                         else
                         if (cmd == "giveadmin")
@@ -615,7 +609,7 @@ client.on('message', message => {
                         else
                         if (cmd == "pay")
                         {
-                            pay(UID,message)
+                            pay(UID,message,args)
                         }
                         else
                         if (cmd == "version")
@@ -708,11 +702,4 @@ client.on('message', message => {
 
 });
 
-app.get('/databasediscordbot', function (req, res) {
-    Get().then((body) =>{
-        res.json(body)
-    })
-})
-
 client.login(token_bot);
-app.listen(port)
